@@ -1,0 +1,108 @@
+from mqtt.mqtt_client import MqttClient
+from devices.led import LED_Device
+from devices.dht import DHT_Device
+import time
+
+class DeviceManager:
+    def __init__(self,client: MqttClient):
+        self.office_id = 1 # 보드 별로 층으로 구분해서 동작할 때 변경
+        self.client = client
+        self.devices = {}
+        self.subscribe_list = {} # subscribe 해야할 디바이스들 여기에
+        self.publish_list = {} # publish 통신하는 디바이스들 여기에
+        
+        # MQTT 콜백 설정
+        # 자바에서 publish 들어오면 _handle_mqtt_message 메서드가 실행됨
+        self.client.set_on_message_callback(self._handle_mqtt_message)
+        # mqtt_client로 브로커 서버랑 연결하면 _on_mqtt_connect 메서드가 실행됨
+        self.client.set_on_connect_callback(self._on_mqtt_connect)
+        
+    # publish 관련 로직 처리
+    def add_publish(self,pub_id: str, device):
+        self.devices[pub_id] = device
+        self.publish_list[pub_id] = device
+    
+    def publish_data(self,device_id,data = None, action = "state"):
+        # publish 토픽, 메시지(payload)으로 데이터 전송
+        # publish topic 구조: {officeId}/{decive_type}/{device_id}/state
+        device = self.devices[device_id]
+        topic = f"{self.office_id}/{device.get_type()}/{device_id}/{action}"
+        if data is None:
+            data = device.handle_mqtt_state()
+        self.client.publish(topic,data)
+        print(f"센서 데이터 발행 완료: {topic}")
+        return True
+    
+    # subscribe 관련 로직 처리
+    def add_subscribe(self,sub_id: str, device):
+        self.subscribe_list[sub_id] = device
+        self.devices[sub_id] = device
+    
+    def control_subscribe(self, actuator_id: str, command):
+        """subscribe 토픽들 처리"""
+        if actuator_id not in self.subscribe_list:
+            print(f"액추에이터가 존재하지 않음: {actuator_id}")
+            return False
+        
+        actuator = self.subscribe_list[actuator_id]
+        if hasattr(actuator, 'handle_mqtt_command'):
+            hasReturn = actuator.handle_mqtt_command(command)
+            if not hasReturn:
+                self.publish_data(actuator_id, hasReturn)
+        else:
+            print(f"액추에이터 제어 메서드가 없음: {actuator_id}")
+            return False
+    
+    def _handle_mqtt_message(self, topic: str, payload):
+        """MQTT 메시지 처리"""
+        """subscribe로 받은 메시지를 처리"""
+        print(f"MQTT 메시지 수신: {topic} -> {payload}")
+        
+        # 토픽 파싱
+        # sub topic 예시
+        # {office_id}/{device_type}/{device_id}/cmd
+        topic_parts = topic.split('/')
+        
+        if len(topic_parts) >= 3:
+            office_id = topic_parts[0]
+            device_type = topic_parts[1]
+            device_id = topic_parts[2]
+            
+            if device_id in self.subscribe_list:
+                self.control_subscribe(device_id, payload)
+            else:
+                print(f"알 수 없는 액추에이터: {device_id}")
+        #토픽 구분 문구가 2개 이하면 잘못된 토픽 형식 
+        else:
+            print(f"잘못된 토픽 형식: {topic}")
+    
+    def _on_mqtt_connect(self):
+        # connection 이후 subscribe 토픽 구독
+        for sub_id, sub_obj in self.subscribe_list.items():
+            topic = f"{self.office_id}/{sub_obj.get_type()}/{sub_id}/cmd"
+            print(f"토픽 구독: {topic}")
+            self.client.subscribe(topic,1)
+            
+    # DeviceManager 리소스 정리
+    def cleanup(self):
+        try:
+            self.devices.clear()
+            self.publish_list.clear()
+            self.subscribe_list.clear()
+            
+            print("모든 디바이스 리소스 정리 완료")
+            
+        except Exception as e:
+            print(f"디바이스 정리 중 오류: {e}")
+            
+# DeviceManager 클래스 메서드들 동작 잘 되나 임시 테스트하는거
+if __name__=="__main__":
+    dm = DeviceManager(MqttClient())
+    dm.add_subscribe("23",LED_Device(23)) #pin_23 조명센서 추가
+    time.sleep(1)
+    dm.add_publish("25",DHT_Device(25)) #pin_25 온습도센서 추가
+    dm.client.connect()
+    time.sleep(1)
+    dm.publish_data("25")
+    time.sleep(1)
+    dm.control_subscribe("23",{"action": "led_on"})
