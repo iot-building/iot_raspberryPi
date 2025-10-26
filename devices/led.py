@@ -86,6 +86,9 @@ class LED_Device:
         else:
             print(f"알 수 없는 LED 명령: {action}")
             return False
+    
+    def clear(self):
+        gpio.output(self.pin,gpio.LOW)
         
 if __name__ == "__main__":
     led = LED_Device(23)

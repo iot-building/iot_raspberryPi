@@ -2,6 +2,7 @@ from mqtt.mqtt_client import MqttClient
 from device_manager import DeviceManager
 from devices.dht import DHT_Device
 from devices.led import LED_Device
+from devices.elevator import Elevator
 import time
 
 def main():
@@ -24,6 +25,11 @@ def main():
     device_manager.add_subscribe(str(led_pin), led_actuator)
     print("LED 액추에이터 초기화 완료")
     
+    elevator = Elevator()
+    device_manager.add_subscribe("ev1",elevator)
+    print("엘리베이터 초기화 완료")
+    
+def connect():
     #Mqtt 연결
     mqtt.connect()
     print("MQTT 브로커 서버 접속 시도")
@@ -77,7 +83,8 @@ def stop():
             print("IoT 시스템 중지 완료")
 
 if __name__ == "__main__":
-    isConnected = main()
+    main()
+    isConnected = connect()
     if isConnected:
         try:
             main_loop()

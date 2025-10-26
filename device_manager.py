@@ -2,6 +2,7 @@ from mqtt.mqtt_client import MqttClient
 from devices.led import LED_Device
 from devices.dht import DHT_Device
 import time
+import json
 
 class DeviceManager:
     def __init__(self,client: MqttClient):
@@ -31,23 +32,27 @@ class DeviceManager:
             data = device.handle_mqtt_state()
         self.client.publish(topic,data)
         print(f"센서 데이터 발행 완료: {topic}")
+        print(f"발행 데이터: {data}")
         return True
     
     # subscribe 관련 로직 처리
     def add_subscribe(self,sub_id: str, device):
         self.subscribe_list[sub_id] = device
         self.devices[sub_id] = device
+        # device 객체에 set_manager 메소드가 있는지 확인하고, 있다면 호출
+        if hasattr(device, 'set_manager'):
+            device.set_manager(self,sub_id)
     
     def control_subscribe(self, actuator_id: str, command):
         """subscribe 토픽들 처리"""
         if actuator_id not in self.subscribe_list:
             print(f"액추에이터가 존재하지 않음: {actuator_id}")
             return False
-        
         actuator = self.subscribe_list[actuator_id]
+        # 각 액추에이터 마다 handel_mqtt_command 메서드를 세팅해야한다.
         if hasattr(actuator, 'handle_mqtt_command'):
             hasReturn = actuator.handle_mqtt_command(command)
-            if not hasReturn:
+            if hasReturn is not False:
                 self.publish_data(actuator_id, hasReturn)
         else:
             print(f"액추에이터 제어 메서드가 없음: {actuator_id}")
@@ -58,8 +63,9 @@ class DeviceManager:
         """subscribe로 받은 메시지를 처리"""
         print(f"MQTT 메시지 수신: {topic} -> {payload}")
         
-        # 토픽 파싱
-        # sub topic 예시
+        msg = json.loads(payload)
+        print(msg)
+        # 토픽 파싱 예시
         # {office_id}/{device_type}/{device_id}/cmd
         topic_parts = topic.split('/')
         
@@ -69,7 +75,7 @@ class DeviceManager:
             device_id = topic_parts[2]
             
             if device_id in self.subscribe_list:
-                self.control_subscribe(device_id, payload)
+                self.control_subscribe(device_id, msg)
             else:
                 print(f"알 수 없는 액추에이터: {device_id}")
         #토픽 구분 문구가 2개 이하면 잘못된 토픽 형식 
@@ -86,6 +92,8 @@ class DeviceManager:
     # DeviceManager 리소스 정리
     def cleanup(self):
         try:
+            for device in self.subscribe_list.values():
+                device.clear()
             self.devices.clear()
             self.publish_list.clear()
             self.subscribe_list.clear()
@@ -106,3 +114,6 @@ if __name__=="__main__":
     dm.publish_data("25")
     time.sleep(1)
     dm.control_subscribe("23",{"action": "led_on"})
+    time.sleep(1)
+    dm.cleanup()
+    
