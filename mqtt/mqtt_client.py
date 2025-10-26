@@ -56,6 +56,8 @@ class MqttClient:
         topic = msg.topic
         value = msg.payload.decode("utf-8")
         print(topic + "===========" + value)
+        if self.on_message_callback:
+            self.on_message_callback(topic,value)
         
     def set_on_message_callback(self, callback):
         """메시지 수신 콜백 함수 설정"""
