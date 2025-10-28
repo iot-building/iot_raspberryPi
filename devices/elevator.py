@@ -29,15 +29,11 @@ class Elevator:
         
     def initialize(self):
         GPIO.setmode( GPIO.BCM )
-        GPIO.setup(self.in1, GPIO.OUT )
-        GPIO.setup(self.in2, GPIO.OUT )
-        GPIO.setup(self.in3, GPIO.OUT )
-        GPIO.setup(self.in4, GPIO.OUT )
+        for pin in self.motor_pins:
+            GPIO.setup(pin,GPIO.OUT)
         # initializing
-        GPIO.output(self.in1, GPIO.LOW )
-        GPIO.output(self.in2, GPIO.LOW )
-        GPIO.output(self.in3, GPIO.LOW )
-        GPIO.output(self.in4, GPIO.LOW )
+        for pin in self.motor_pins:
+            GPIO.output(pin,GPIO.LOW)
         
     def turn(self,count,direction = False): # default : 시계 방향
         motor_step_counter = 0
@@ -81,42 +77,56 @@ class Elevator:
     def get_type(self): # 토픽을 생성하기 위함
         return self.type 
     
-    def set_manager(self, manager,id):
+    def set_manager(self, manager, id):
         self.manager = manager
         self.device_id = id
     
-    def publish_state(self, action: str, start, end):
+    def publish_state(self, action: str, start, end=None):
         """엘리베이터의 현재 상태를 MQTT로 발행합니다."""
         if self.manager and self.device_id:
             # 발행할 데이터 생성
             data = {
                 "from_floor": start,
                 "to_floor" : end,
-                "status": action
+                "action": action
                 }
             # DeviceManager의 publish_data 메소드 호출
             self.manager.publish_data(self.device_id, data)
     
     def handle_mqtt_command(self, command):
-        """MQTT 명령 처리"""
-        action = command.get("action", "").lower()
-        print(command,action)
-        if action == "call":
+        """JAVA에서 들어온 MQTT 명령 처리"""
+        action = command.get("action", "").lower() # {"action": "call"} 데이터일 경우 action = "call"
+        if action == "call": # 엘리베이터 제어 (층 이동)
+            if self.state is False:
+                print("엘리베이터를 현재 이용할 수 없습니다.")
+                return False
             start_floor = int(command.get("start_floor"))
             end_floor = int(command.get("end_floor"))
-            #최근 엘리베이터 층 -> start 층 이동
-            if self.turnFloors(self.last_floor,start_floor):
-                self.publish_state("call", start_floor, end_floor)
-            print(f"{start_floor}층에 도착완료")
-            time.sleep(3)
-            # start 층 -> end 층 이동
-            if self.turnFloors(self.last_floor,end_floor):
-                self.publish_state("arrive",start_floor,end_floor)
-            print(f"{end_floor}층에 도착완료")
-            return False
+            self.call_and_arrive(start_floor,end_floor)
+        elif action == "state_return": # 엘리베이터의 현재 상태를 요청하는 Mqtt 통신
+            result = "enable" if self.state == True else "disable"
+            self.publish_state(result, self.last_floor)
+        elif action == "state_change":
+            self.state = bool(command.get("state"))
+            result = "enable" if self.state == True else "disable"
+            print("엘리베이터 상태 변경: ", result)
         else:
             print(f"알 수 없는 E/V 명령: {action}")
             return False
+    def call_and_arrive(self,start,end):
+        #원래 엘리베이터 층 -> start 층 이동
+        if self.turnFloors(self.last_floor,start):
+            self.publish_state("call", start, end)
+            # 이제 Mqtt로 Java에 안보내고, MySQL DB에 로그 형태로 저장할거임.
+        print(f"{start}층에 도착했습니다.")
+        print("문이 열립니다.")
+        time.sleep(3) 
+        print("문이 닫힙니다.")
+        # start 층 -> end 층 이동
+        if self.turnFloors(self.last_floor,end):
+            self.publish_state("arrive",start,end)
+            # 이제 Mqtt로 Java에 안보내고, MySQL DB에 로그 형태로 저장할거임.
+        print(f"{end}층에 도착완료")
 
 # the meat
 if __name__ == "__main__":

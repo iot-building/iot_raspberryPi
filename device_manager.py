@@ -41,6 +41,7 @@ class DeviceManager:
         self.devices[sub_id] = device
         # device 객체에 set_manager 메소드가 있는지 확인하고, 있다면 호출
         if hasattr(device, 'set_manager'):
+            print("set_manager")
             device.set_manager(self,sub_id)
     
     def control_subscribe(self, actuator_id: str, command):
@@ -52,8 +53,6 @@ class DeviceManager:
         # 각 액추에이터 마다 handel_mqtt_command 메서드를 세팅해야한다.
         if hasattr(actuator, 'handle_mqtt_command'):
             hasReturn = actuator.handle_mqtt_command(command)
-            if hasReturn is not False:
-                self.publish_data(actuator_id, hasReturn)
         else:
             print(f"액추에이터 제어 메서드가 없음: {actuator_id}")
             return False
