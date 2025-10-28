@@ -59,29 +59,36 @@ class LED_Device:
         """LED 타입 반환"""
         return self.type
     
-    def get_state(self):
-        """LED 현재 상태 반환"""
-        return {
-            "pin": self.pin,
-            "state": self.current_state,
-            "brightness": self.brightness
-        }     
+    def publish_state(self, action: str):
+        """LED의 현재 상태를 MQTT로 발행합니다."""
+        if self.manager and self.device_id:
+            # 발행할 데이터 생성
+            data = {
+                "action": action,
+                "pin": self.pin,
+                "state": self.current_state,
+                "brightness": self.brightness
+            }     
+            # DeviceManager의 publish_data 메소드 호출
+            self.manager.publish_data(self.device_id, data)
         
+    def set_manager(self, manager, id):
+        self.manager = manager
+        self.device_id = id
+    
     def handle_mqtt_command(self, command):
         """MQTT 명령 처리"""
         action = command.get("action", "").lower()
         print(command, action)
         if action == "led_on":
             self.set_power(True)
-            return False
         elif action == "led_off":
             self.set_power(False)
-            return False
         elif action == "brightness":
             brightness = int(command.get("brightness"))
             self.set_brightness(brightness)
-            return False
         elif action == "state_return":
+            self.publish_state(action,)
             return self.get_state()
         else:
             print(f"알 수 없는 LED 명령: {action}")
