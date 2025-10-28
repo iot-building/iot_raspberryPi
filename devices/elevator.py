@@ -1,6 +1,10 @@
 #!/usr/bin/python3
 import RPi.GPIO as GPIO
 import time
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from database.db_connect import DBManager
 
 # defining stepper motor sequence (found in documentation http://www.4tronix.co.uk/arduino/Stepper-Motors.php)
 global step_sequence
@@ -35,6 +39,14 @@ class Elevator:
         for pin in self.motor_pins:
             GPIO.output(pin,GPIO.LOW)
         
+        # DB Connect
+        self.db = DBManager()
+
+        # DB 연결이 성공했는지 check
+        if not self.db.conn or not self.db.conn.is_connected():
+            print("DB 작업을 수행할 수 없습니다.")
+            return
+        
     def turn(self,count,direction = False): # default : 시계 방향
         motor_step_counter = 0
         for i in range(int(count*4)):
@@ -66,8 +78,7 @@ class Elevator:
         else: # ex. start: 3 -> end: 2
             direction = False # 층을 내려가는 방향으로 회전
             count = -count
-        self.turnDegrees(360*count,direction)
-        self.last_floor = end
+        self.turnDegrees(360*5*count,direction)
         return True
         
     def clear(self):
@@ -87,7 +98,6 @@ class Elevator:
             # 발행할 데이터 생성
             data = {
                 "from_floor": start,
-                "to_floor" : end,
                 "action": action
                 }
             # DeviceManager의 publish_data 메소드 호출
@@ -102,7 +112,9 @@ class Elevator:
                 return False
             start_floor = int(command.get("start_floor"))
             end_floor = int(command.get("end_floor"))
-            self.call_and_arrive(start_floor,end_floor)
+            user_id = int(command.get("userId"))
+            
+            self.call_and_arrive(start_floor,end_floor,user_id)
         elif action == "state_return": # 엘리베이터의 현재 상태를 요청하는 Mqtt 통신
             result = "enable" if self.state == True else "disable"
             self.publish_state(result, self.last_floor)
@@ -113,20 +125,35 @@ class Elevator:
         else:
             print(f"알 수 없는 E/V 명령: {action}")
             return False
-    def call_and_arrive(self,start,end):
+    def call_and_arrive(self,start,end,user_id):
         #원래 엘리베이터 층 -> start 층 이동
+        data = self.insert_db_log(start,end,"called",user_id)
+        self.db.insert_data("elevator_log",data)
         if self.turnFloors(self.last_floor,start):
-            self.publish_state("call", start, end)
-            # 이제 Mqtt로 Java에 안보내고, MySQL DB에 로그 형태로 저장할거임.
+            data = self.insert_db_log(self.last_floor,start,"arrived",user_id)
+            self.last_floor = start
+            self.db.insert_data("elevator_log",data)
         print(f"{start}층에 도착했습니다.")
         print("문이 열립니다.")
         time.sleep(3) 
         print("문이 닫힙니다.")
         # start 층 -> end 층 이동
-        if self.turnFloors(self.last_floor,end):
-            self.publish_state("arrive",start,end)
-            # 이제 Mqtt로 Java에 안보내고, MySQL DB에 로그 형태로 저장할거임.
+        if self.turnFloors(start,end):
+            data = self.insert_db_log(start,end,"arrived",user_id)
+            self.last_floor = end
+            self.db.insert_data("elevator_log",data)
         print(f"{end}층에 도착완료")
+        
+    def insert_db_log(self,start_floor,end_floor,status,user_id):
+        data = {
+            "from_floor": start_floor,
+            "to_floor": end_floor,
+            "status": status,
+            "user_id": user_id,
+            "device_id": self.device_id
+        }
+        return data
+    
 
 # the meat
 if __name__ == "__main__":
