@@ -5,8 +5,8 @@ import time
 import json
 
 class DeviceManager:
-    def __init__(self,client: MqttClient):
-        self.office_id = 1 # 보드 별로 층으로 구분해서 동작할 때 변경
+    def __init__(self,client: MqttClient, office_id):
+        self.office_id = office_id # 보드 별로 층으로 구분해서 동작할 때 변경
         self.client = client
         self.devices = {}
         self.subscribe_list = {} # subscribe 해야할 디바이스들 여기에
@@ -44,17 +44,14 @@ class DeviceManager:
             print("set_manager")
             device.set_manager(self,sub_id)
     
-    def control_subscribe(self, actuator_id: str, command):
+    def control_subscribe(self, target, command):
         """subscribe 토픽들 처리"""
-        if actuator_id not in self.subscribe_list:
-            print(f"액추에이터가 존재하지 않음: {actuator_id}")
-            return False
-        actuator = self.subscribe_list[actuator_id]
+        actuator = target
         # 각 액추에이터 마다 handel_mqtt_command 메서드를 세팅해야한다.
         if hasattr(actuator, 'handle_mqtt_command'):
             hasReturn = actuator.handle_mqtt_command(command)
         else:
-            print(f"액추에이터 제어 메서드가 없음: {actuator_id}")
+            print(f"액추에이터 제어 메서드가 없음")
             return False
     
     def _handle_mqtt_message(self, topic: str, payload):
@@ -72,9 +69,11 @@ class DeviceManager:
             office_id = topic_parts[0]
             device_type = topic_parts[1]
             device_id = topic_parts[2]
-            
-            if device_id in self.subscribe_list:
-                self.control_subscribe(device_id, msg)
+            for sub_id, sub_obj in self.subscribe_list.items():
+                # device_type이 동일한 디바이스를 찾기
+                if sub_obj.type == device_type:
+                    if sub_id == device_id:
+                        self.control_subscribe(sub_obj,msg)
             else:
                 print(f"알 수 없는 액추에이터: {device_id}")
         #토픽 구분 문구가 2개 이하면 잘못된 토픽 형식 

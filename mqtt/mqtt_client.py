@@ -13,7 +13,6 @@ class MqttClient:
         self.broker_host = os.getenv("BROKER_HOST")
         self.broker_port = int(os.getenv("BROKER_PORT")) # 포트는 정수형
         self.client_id = client_id
-        print(self.broker_host, self.broker_port)
         self.client = None
         self.connected = False
         

@@ -1,3 +1,15 @@
+# Pi #1 (1층 + 주차장) | IP: 192.168.14.
+# ┌─────────────────────────────┐
+# │ LED 조명(1층)    Pin 23 PWM
+# │ 서보모터(1층)    Pin 24 PWM
+# │ DHT11 센서       Pin 25 1-Wire
+# │
+# │ [주차장]
+# │ 초음파 TRIG      Pin 5 GPIO
+# │ 초음파 ECHO      Pin 6 GPIO
+# │ 서보모터         Pin 26 PWM
+# └─────────────────────────────┘
+
 from mqtt.mqtt_client import MqttClient
 from device_manager import DeviceManager
 from devices.dht import DHT_Device
@@ -6,29 +18,42 @@ from devices.elevator import Elevator
 import time
 
 def main():
-    print("IoT Raspberry Pi 시스템 시작")
+    print("""
+          # Pi #1 (1층 + 주차장) r4
+# ┌─────────────────────────────┐
+# │ LED 조명(1층)    Pin 23 PWM
+# │ 서보모터(1층)    Pin 24 PWM
+# │ DHT11 센서       Pin 25 1-Wire
+# │
+# │ [주차장]
+# │ 초음파 TRIG      Pin 5 GPIO
+# │ 초음파 ECHO      Pin 6 GPIO
+# │ 서보모터         Pin 26 PWM
+# └─────────────────────────────┘
+          """)
     global mqtt, device_manager
     mqtt = MqttClient()
-    office_id = 1 # 해당 officeID 값 Mqtt 통신할 때 토픽으로 받는 값이
-    # {office_id}/{device_type}{device_pin}/cmd
-    device_manager = DeviceManager(mqtt,office_id)
+    device_manager = DeviceManager(mqtt)
     
     # 디바이스 초기화
+    # LED 액추에이터
+    led_pin = 23
+    led_actuator = LED_Device(led_pin)
+    device_manager.add_subscribe(str(led_pin), led_actuator)
+    print("LED 액추에이터 초기화 완료")
+    # 서보모터 ???
+    servo_pin =24
+    # 서보모터 생성자 생성
+    # device_manager.add_subscribe() 추가
     
-    # DHT 온습도 센서 추가 (주로 publish)
-    # dht_pin = 25
-    # dht_sensor = DHT_Device(dht_pin)
-    # device_manager.add_publish(str(dht_pin), dht_sensor)
-    # print("DHT 센서 초기화 완료")
-    
-    # LED 액추에이터 추가 (주로 subscribe)
-    # led_pin = 23
-    # led_actuator = LED_Device(led_pin)
-    # device_manager.add_subscribe(str(led_pin), led_actuator)
-    # print("LED 액추에이터 초기화 완료")
+    # DHT 온습도 센서
+    dht_pin = 25
+    dht_sensor = DHT_Device(dht_pin)
+    device_manager.add_publish(str(dht_pin), dht_sensor)
+    print("DHT 센서 초기화 완료")
     
     elevator = Elevator()
-    device_manager.add_subscribe("1",elevator)
+    device_manager.add_subscribe("4",elevator)
     print("엘리베이터 초기화 완료")
     
 def connect():
