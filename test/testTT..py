@@ -5,6 +5,7 @@ from adafruit_mcp3xxx.analog_in import AnalogIn
 import adafruit_dht
 import mysql.connector
 from mysql.connector import Error
+import paho.mqtt.publish as publish
 
 # ===============================
 # DB 설정
@@ -19,10 +20,10 @@ DB = {
 # ===============================
 # 장치 매핑
 # ===============================
-DEVICE_DHT = 17    # DHT-202B
-DEVICE_MQ2 = 19    # MQ2-202B
-DEVICE_HVAC = 20   # HVAC-202B
-OFFICE_ID = 2      # 202B 오피스
+DEVICE_DHT = 7    # DHT-202B
+DEVICE_MQ2 = 10    # MQ2-202B
+DEVICE_HVAC = 9   # HVAC-202B
+OFFICE_ID = 1      # 202B 오피스
 USER_ID = None     # 자동 발생 이벤트
 
 # ===============================
@@ -131,7 +132,14 @@ def main():
                 # 이벤트 감지
                 if gas_ppm > GAS_THRESHOLD:
                     insert_event(conn, DEVICE_MQ2, OFFICE_ID, "FIRE", "ALERT", f"{gas_ppm:.1f}", "가스농도 초과")
+                    BROKER_IP = "192.168.14.74"
+                    TOPIC_GAS = "building/gas"
                     update_device_status(conn, DEVICE_MQ2, "ALERT")
+                    try:
+                        publish.single(TOPIC_GAS, payload="ALERT", hostname=BROKER_IP)
+                        print("📡 MQTT 발행 완료 → building/gas : ALERT")
+                    except Exception as e:
+                        print(f"⚠️ MQTT 발행 실패: {e}")
                 else:
                     update_device_status(conn, DEVICE_MQ2, "IDLE")
 
