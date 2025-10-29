@@ -1,3 +1,13 @@
+# Pi #2 (2층.3층 + 화재경보) | IP: 192.168.14.
+# ┌─────────────────────────────┐
+# │ LED 조명(2층)    Pin 23 PWM
+# │ 경보장치         Pin 22 PWM
+# │ LED 조명(3층)    Pin 26 PWM
+# │ 서보모터(2층)    Pin 24 PWM
+# │ 화재센서(MQ-2)   Pin 27 INPUT
+# │ 서보모터(3층)    Pin 4 PWM
+# └─────────────────────────────┘
+
 from mqtt.mqtt_client import MqttClient
 from device_manager import DeviceManager
 from devices.dht import DHT_Device
@@ -9,8 +19,10 @@ def main():
     print("IoT Raspberry Pi 시스템 시작")
     global mqtt, device_manager
     mqtt = MqttClient()
-    office_id = 1 # 해당 officeID 값 Mqtt 통신할 때 토픽으로 받는 값이
+    # 해당 officeID 값 Mqtt 통신할 때 토픽으로 받는 값이
     # {office_id}/{device_type}{device_pin}/cmd
+    # 여기서는 2층과 3층을 제어해야댐
+    office_id = 1 
     device_manager = DeviceManager(mqtt,office_id)
     
     # 디바이스 초기화
@@ -22,14 +34,14 @@ def main():
     # print("DHT 센서 초기화 완료")
     
     # LED 액추에이터 추가 (주로 subscribe)
-    # led_pin = 23
-    # led_actuator = LED_Device(led_pin)
-    # device_manager.add_subscribe(str(led_pin), led_actuator)
-    # print("LED 액추에이터 초기화 완료")
-    
-    elevator = Elevator()
-    device_manager.add_subscribe("1",elevator)
-    print("엘리베이터 초기화 완료")
+    led_pin1 = 23
+    led_actuator1 = LED_Device(led_pin1)
+    device_manager.add_subscribe(str(led_pin1), led_actuator1)
+    print("LED 액추에이터 초기화 완료")
+    led_pin2 = 26
+    led_actuator2 = LED_Device(led_pin2)
+    device_manager.add_subscribe(str(led_pin2), led_actuator2)
+    print("LED 액추에이터 초기화 완료")
     
 def connect():
     #Mqtt 연결

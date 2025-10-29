@@ -1,7 +1,13 @@
+# Pi #3 (건물 외부 - 엘리베이터) | IP: 192.168.14.**
+# ┌─────────────────────────────┐
+# │ 스텝모터 IN1     Pin 12 GPIO
+# │ 스텝모터 IN2     Pin 16 GPIO
+# │ 스텝모터 IN3     Pin 20 GPIO
+# │ 스텝모터 IN4     Pin 21 GPIO
+# └─────────────────────────────┘
+
 from mqtt.mqtt_client import MqttClient
 from device_manager import DeviceManager
-from devices.dht import DHT_Device
-from devices.led import LED_Device
 from devices.elevator import Elevator
 import time
 
@@ -14,18 +20,6 @@ def main():
     device_manager = DeviceManager(mqtt,office_id)
     
     # 디바이스 초기화
-    
-    # DHT 온습도 센서 추가 (주로 publish)
-    # dht_pin = 25
-    # dht_sensor = DHT_Device(dht_pin)
-    # device_manager.add_publish(str(dht_pin), dht_sensor)
-    # print("DHT 센서 초기화 완료")
-    
-    # LED 액추에이터 추가 (주로 subscribe)
-    # led_pin = 23
-    # led_actuator = LED_Device(led_pin)
-    # device_manager.add_subscribe(str(led_pin), led_actuator)
-    # print("LED 액추에이터 초기화 완료")
     
     elevator = Elevator()
     device_manager.add_subscribe("1",elevator)
