@@ -8,20 +8,19 @@ class ServoGate:
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.pin, GPIO.OUT)
-        print(f"✅ 서보모터 핀 초기화 완료 (핀 {self.pin})")
 
-    def _move(self, duty):
-        """PWM을 매번 새로 생성해서 충돌 방지"""
-        pwm = GPIO.PWM(self.pin, 50)
-        pwm.start(0)
-        pwm.ChangeDutyCycle(duty)
-        time.sleep(1.2)
-        pwm.ChangeDutyCycle(0)
-        pwm.stop()
+        # ✅ PWM 객체를 한 번만 생성해서 재사용
+        self.pwm = GPIO.PWM(self.pin, 50)  # 50Hz 주파수
+        self.pwm.start(0)
+        print(f"✅ 서보모터 초기화 완료 (핀 {self.pin})")
 
     def set_angle(self, angle):
-        duty = 2.5 + (angle / 18)
-        self._move(duty)
+        """각도를 DutyCycle로 변환해 이동"""
+        duty = 2.5 + (angle / 18)  # 0~180도 범위
+        print(f"⚙️ 이동: {angle}° (Duty={duty:.2f})")
+        self.pwm.ChangeDutyCycle(duty)
+        time.sleep(1.5)  # 서보가 물리적으로 움직일 시간 확보
+        self.pwm.ChangeDutyCycle(0)  # 떨림 방지
 
     def open_gate(self):
         print("🔓 차단기 열림")
@@ -40,5 +39,6 @@ class ServoGate:
         Thread(target=self.close_gate, daemon=True).start()
 
     def cleanup(self):
+        self.pwm.stop()
         GPIO.cleanup(self.pin)
         print("🧹 서보모터 핀 정리 완료")

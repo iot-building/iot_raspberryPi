@@ -162,7 +162,7 @@ def insert_event(conn, device_id, office_id, etype, action, value, note):
         VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
     cur = conn.cursor()
-    cur.execute(sql, (device_id, USER_ID, office_id, etype, action, value, note))
+    cur.execute(sql, (device_id, user_id, office_id, etype, action, value, note))
     conn.commit()
     cur.close()
     print(f"🚨 EVENT_LOG → [{etype}] {action} ({note})")
